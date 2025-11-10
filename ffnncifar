@@ -1,0 +1,97 @@
+
+#---------import libraries----------
+import tensorflow as tf
+import numpy as np
+import matplotlib.pyplot as plt
+from keras.datasets import cifar10
+from keras import models, layers
+
+
+#---------load dataset----------
+(x_train, y_train),(x_test, y_test) = cifar10.load_data()
+
+#---------normalize----------
+x_train = x_train.astype('float32')/255.0
+x_test = x_test.astype('float32')/255.0
+
+
+#---------flatten image----------
+# x_train = x_train.reshape(x_train.shape[0],-1)
+# x_test = x_test.reshape(x_test.shape[0],-1)
+
+#---------flatten labels----------
+y_train = y_train.flatten()
+y_test = y_test.flatten()
+
+
+#---------FFNN--------
+model = models.Sequential([
+    layers.Flatten(input_shape=(32,32,3)),
+    layers.Dense(512, activation='relu'),
+    layers.Dense(256, activation='relu'),
+    layers.Dense(128, activation='relu'),
+    layers.Dense(10, activation='softmax')
+])
+
+#---------compile model--------
+model.compile(
+    optimizer='adam',
+    loss= 'sparse_categorical_crossentropy',
+    metrics =['accuracy'])
+
+#---------train model--------
+history = model.fit(x_train, y_train, epochs=10, validation_data=(x_test,y_test))
+
+#---------evaluate model--------
+test_loss , test_acc = model.evaluate(x_test, y_test)
+print("Accuracy:: ",test_acc)
+
+
+#---------plot accuracy and loss--------
+plt.figure(figsize=(12,5))
+
+#accuracy
+plt.subplot(1,2,1)
+plt.plot(history.history['accuracy'], label='Training accuracy')
+plt.plot(history.history['val_accuracy'],label='Validation Accuracy')
+plt.title('Accuracy over Epochs')
+plt.xlabel('Epochs')
+plt.ylabel('Accuracy')
+plt.legend()
+
+#loss
+plt.subplot(1,2,1)
+plt.plot(history.history['loss'], label='Training loss')
+plt.plot(history.history['val_loss'],label='Validation loss')
+plt.title('Loss over Epochs')
+plt.xlabel('Epochs')
+plt.ylabel('Loss')
+plt.legend()
+
+plt.tight_layout()
+plt.show()
+
+#------------predict output--------------
+y_pred = model.predict(x_test)
+y_pred_class = np.argmax(y_pred, axis=1)
+
+print("Actual label  ::",y_test[:10])
+print("Predicted label:",y_pred_class[:10])
+
+
+class_names = ['Airplane', 'Automobile', 'Bird', 'Cat', 'Deer', 
+               'Dog', 'Frog', 'Horse', 'Ship', 'Truck']
+
+
+plt.figure(figsize=(12,5))
+
+for i in range(5):
+    plt.subplot(1,5,i+1)
+    plt.imshow(x_test[i].reshape(32,32,3))
+    plt.title(f"Pred: {class_names[y_pred_class[i]]}\nTrue: {class_names[y_test[i]]}")
+    plt.axis('off')
+plt.tight_layout()
+plt.show()
+ 
+ 
+ 
