@@ -1,0 +1,150 @@
+
+# =============================================================
+# Object Detection (Classification) using Transfer Learning
+# Dataset: Food Dataset
+# Model: MobileNetV2 (pretrained on ImageNet)
+# =============================================================
+
+import os
+import tensorflow as tf
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.applications import MobileNetV2
+from tensorflow.keras import layers, models
+from sklearn.metrics import accuracy_score, classification_report
+import numpy as np
+
+# =============================================================
+# Step 1: Define dataset paths
+# =============================================================
+train_data_dir = "C:/Users/pratiksha sathe/Downloads/food_dataset/train"  
+test_data_dir = "C:/Users/pratiksha sathe/Downloads/food_dataset/test"   
+
+# =============================================================
+# Step 2: Define image size and batch size
+# =============================================================
+img_size = (224, 224)
+batch_size = 32
+
+# =============================================================
+# Step 3: Create ImageDataGenerators
+# =============================================================
+train_datagen = ImageDataGenerator(
+    rescale=1./255,
+    validation_split=0.2,      # 20% of data for validation
+    rotation_range=20,
+    zoom_range=0.2,
+    shear_range=0.2,
+    horizontal_flip=True
+)
+
+test_datagen = ImageDataGenerator(rescale=1./255)
+
+# =============================================================
+# Step 4: Load training, validation, and test datasets
+# =============================================================
+train_data = train_datagen.flow_from_directory(
+    train_data_dir,
+    target_size=img_size,
+    batch_size=batch_size,
+    class_mode="categorical",
+    subset="training"
+)
+
+val_data = train_datagen.flow_from_directory(
+    train_data_dir,
+    target_size=img_size,
+    batch_size=batch_size,
+    class_mode="categorical",
+    subset="validation"
+)
+
+test_data = test_datagen.flow_from_directory(
+    test_data_dir,
+    target_size=img_size,
+    batch_size=batch_size,
+    class_mode="categorical",
+    shuffle=False
+)
+
+# =============================================================
+# Step 5: Load MobileNetV2 base model (Transfer Learning)
+# =============================================================
+base_model = MobileNetV2(
+    input_shape=(224, 224, 3),
+    include_top=False,   # remove top classifier
+    weights="imagenet"   # use pretrained weights
+)
+base_model.trainable = False  # freeze base model layers
+
+# =============================================================
+# Step 6: Build the model
+# =============================================================
+model = models.Sequential([
+    base_model,
+    layers.GlobalAveragePooling2D(),
+    layers.Dropout(0.3),
+    layers.Dense(512, activation='relu'),
+    layers.Dense(train_data.num_classes, activation='softmax')
+])
+
+# =============================================================
+# Step 7: Compile the model
+# =============================================================
+model.compile(
+    optimizer=tf.keras.optimizers.Adam(learning_rate=0.0001),
+    loss="categorical_crossentropy",
+    metrics=["accuracy"]
+)
+
+# =============================================================
+# Step 8: Train the model
+# =============================================================
+epochs = 5
+history = model.fit(
+    train_data,
+    validation_data=val_data,
+    epochs=epochs
+)
+
+# =============================================================
+# Step 9: Save the trained model
+# =============================================================
+model.save("food_object_detection_model.h5")
+print("Model saved as food_object_detection_model.h5")
+
+# =============================================================
+# Step 10: Evaluate on Test Data
+# =============================================================
+test_loss, test_accuracy = model.evaluate(test_data)
+print(f" Test Loss: {test_loss:.4f}")
+print(f" Test Accuracy: {test_accuracy * 100:.2f}%")
+
+# =============================================================
+# Step 11: Generate Predictions
+# =============================================================
+predictions = model.predict(test_data)
+predicted_classes = np.argmax(predictions, axis=1)
+true_classes = test_data.classes
+
+# Classification report
+class_names = list(test_data.class_indices.keys())
+
+print("\n Classification Report:")
+print(classification_report(true_classes, predicted_classes, target_names=class_names))
+
+# =============================================================
+# Step 12: Visualize predictions
+# =============================================================
+import matplotlib.pyplot as plt
+
+plt.figure(figsize=(10, 8))
+for i in range(9):
+    img, label = test_data.next()
+    plt.subplot(3, 3, i+1)
+    plt.imshow(img[0])
+    pred_class = class_names[np.argmax(model.predict(img))]
+    true_class = class_names[np.argmax(label[0])]
+    plt.title(f"Pred: {pred_class}\nTrue: {true_class}")
+    plt.axis('off')
+plt.tight_layout()
+plt.show()
