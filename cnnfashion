@@ -1,0 +1,89 @@
+
+#---------import libraries----------
+import tensorflow as tf
+import numpy as np
+import matplotlib.pyplot as plt
+from keras.datasets import fashion_mnist
+from keras import layers, models
+
+#------------load Dataset-----------
+(x_train, y_train),(x_test, y_test) = fashion_mnist.load_data()
+
+#---------normalize---------------
+x_train = x_train.astype('float32')/255.0
+x_test = x_test.astype('float32')/255.0
+
+#---------reshape---------------
+x_train = x_train.reshape(-1, 28,28,1)
+x_test = x_test.reshape(-1, 28,28,1)
+
+#---------build cnn model---------------
+model= models.Sequential([
+    layers.Conv2D(32,(3,3), activation='relu', input_shape=(28,28,1)),
+    layers.MaxPooling2D((2,2)),
+    layers.Conv2D(64,(3,3), activation='relu'),
+    layers.MaxPooling2D((2,2)),
+    layers.Flatten(),
+    layers.Dense(128, activation='relu'),
+    layers.Dense(10, activation='softmax')
+])
+
+
+#---------compile model---------------
+model.compile(
+    optimizer ='adam',
+    loss='sparse_categorical_crossentropy',
+    metrics=['accuracy'])
+
+#---------train model---------------
+history = model.fit(x_train, y_train, epochs=10, validation_data=(x_test, y_test))
+
+#---------evaluate model---------------
+test_loss, test_acc= model.evaluate(x_test, y_test)
+print("Accuracy :: ",test_acc)
+print("Loss     :: ",test_loss)
+
+#---------plot graph---------------
+plt.figure(figsize=(12,5))
+
+plt.subplot(1,2,1)
+plt.plot(history.history['accuracy'], label='Training accuracy')
+plt.plot(history.history['val_accuracy'], label='Validation accuracy')
+plt.title('Accuracy over epochs')
+plt.xlabel('epochs')
+plt.ylabel('accuracy')
+plt.legend()
+
+plt.subplot(1,2,2)
+plt.plot(history.history['loss'], label='Training loss')
+plt.plot(history.history['val_loss'], label='Validation loss')
+plt.title('loss over epochs')
+plt.xlabel('epochs')
+plt.ylabel('loss')
+plt.legend()
+
+plt.tight_layout()
+plt.show()
+
+#---------predict output---------------
+y_pred = model.predict(x_test)
+y_pred_class = y_pred.argmax(axis=1)
+
+class_names = [
+    'T-shirt/top', 'Trouser', 'Pullover', 'Dress', 'Coat',
+    'Sandal', 'Shirt', 'Sneaker', 'Bag', 'Ankle boot'
+]
+
+
+plt.figure(figsize=(10,5))
+for i in range(5):
+    plt.subplot(1,5,i+1)
+    plt.imshow(x_test[i].reshape(28,28))
+    pred_label = class_names[y_pred_class[i]]
+    true_label=  class_names[y_test[i]]
+    plt.title(f"Predition: {pred_label}\n True: {true_label}")
+    plt.axis('off')
+plt.tight_layout()
+plt.show()
+ 
+ 
