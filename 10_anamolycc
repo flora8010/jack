@@ -1,0 +1,109 @@
+# =====================================================
+# Autoencoder for Anomaly Detection (Credit Card Fraud)
+# =====================================================
+import numpy as np
+import pandas as pd
+import tensorflow as tf
+from tensorflow.keras import layers, models, regularizers
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
+import matplotlib.pyplot as plt
+from sklearn.metrics import confusion_matrix, classification_report
+import seaborn as sns
+
+# --- Step 1: Load Dataset ---
+url = "https://storage.googleapis.com/download.tensorflow.org/data/creditcard.csv"
+data = pd.read_csv(url)
+print("Dataset shape:", data.shape)
+print(data.head())
+
+'''# Load the dataset
+dataset = pd.read_csv('creditcard.csv')
+# Separate features and target labels
+x = dataset.drop('Class', axis=1)
+y = dataset['Class']
+'''
+
+# --- Step 2: Separate normal and fraud transactions ---
+normal = data[data['Class'] == 0]
+fraud = data[data['Class'] == 1]
+
+# --- Step 3: Prepare features ---
+X = data.drop('Class', axis=1)
+y = data['Class']
+
+# --- Step 4: Standardize input data ---
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+# --- Step 5: Split into train-test ---
+X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2, random_state=42)
+
+# Train only on NORMAL transactions
+X_train = X_train[y_train == 0]
+print("Normal training samples:", X_train.shape[0])
+
+# --- Step 6: Build Autoencoder model ---
+input_dim = X_train.shape[1]
+
+input_layer = layers.Input(shape=(input_dim,))
+encoded = layers.Dense(16, activation='relu')(input_layer)
+encoded = layers.Dense(8, activation='relu',
+                       activity_regularizer=regularizers.l1(1e-5))(encoded)  # sparsity
+decoded = layers.Dense(16, activation='relu')(encoded)
+decoded = layers.Dense(input_dim, activation='sigmoid')(decoded)
+
+autoencoder = models.Model(inputs=input_layer, outputs=decoded)
+autoencoder.compile(optimizer='adam', loss='mse')
+
+autoencoder.summary()
+
+# --- Step 7: Train Autoencoder ---
+history = autoencoder.fit(
+    X_train, X_train,
+    epochs=20,
+    batch_size=256,
+    shuffle=True,
+    validation_split=0.2,
+    verbose=1
+)
+
+# --- Step 8: Compute reconstruction error ---
+reconstructions = autoencoder.predict(X_test)
+mse = np.mean(np.power(X_test - reconstructions, 2), axis=1)
+
+# --- Step 9: Set threshold for anomaly detection ---
+threshold = np.percentile(mse, 95)
+print("Reconstruction error threshold:", threshold)
+
+# --- Step 10: Label anomalies ---
+y_pred = (mse > threshold).astype(int)
+
+# --- Step 11: Evaluate ---
+# Compute confusion matrix
+cm = confusion_matrix(y_test, y_pred)
+
+# Print matrix values
+print("\nConfusion Matrix:")
+print(cm)
+
+# Plot heatmap
+plt.figure(figsize=(6,4))
+sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', cbar=False, annot_kws={"size": 14})
+plt.xlabel("Predicted Class")
+plt.ylabel("True Class")
+plt.title("Confusion Matrix - Autoencoder Anomaly Detection")
+plt.show()
+
+print("\nClassification Report:")
+print(classification_report(y_test, y_pred))
+# --- Step 12: Visualize reconstruction error ---
+# Plot the MSE and threshold for visualization
+plt.figure(figsize=(12,6))
+plt.plot(mse, label="MSE", marker='o', linestyle='', markersize=3)
+plt.axhline(threshold, label="Threshold", color="red")
+plt.xlabel("Index")
+plt.ylabel("MSE")
+plt.title("Anomaly Detection")
+plt.legend()
+plt.show()
