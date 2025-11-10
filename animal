@@ -1,0 +1,115 @@
+
+# ==========================================================
+# Transfer Learning for Animal Image Classification
+# Using MobileNetV2 (TensorFlow / Keras)
+# ==========================================================
+import numpy as np
+import tensorflow as tf
+from tensorflow.keras.optimizers import Adam
+import matplotlib.pyplot as plt
+from tensorflow.keras.models import Model
+from tensorflow.keras.applications import MobileNetV2
+from tensorflow.keras.layers import Dense, GlobalAveragePooling2D, Dropout
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from sklearn.metrics import classification_report
+
+# ==========================================================
+# Step 1: Load Pretrained MobileNetV2
+# ==========================================================
+base_model = MobileNetV2(weights='imagenet', include_top=False, input_shape=(224, 224, 3))
+base_model.trainable = False  # Freeze base layers
+
+# ==========================================================
+# Step 2: Add custom classification layers
+# ==========================================================
+x = base_model.output
+x = GlobalAveragePooling2D()(x)
+x = Dense(128, activation='relu')(x)
+x = Dropout(0.3)(x)
+predictions = Dense(10, activation='softmax')(x)  # 10 animal classes
+
+model = Model(inputs=base_model.input, outputs=predictions)
+
+# ==========================================================
+# Step 3: Compile model
+# ==========================================================
+model.compile(optimizer=Adam(learning_rate=0.0001),
+              loss='categorical_crossentropy',
+              metrics=['accuracy'])
+
+# ==========================================================
+# Step 4: Data Preparation
+# ==========================================================
+data_dir = r"C:\Users\payal\OneDrive\Desktop\DL COdes\raw-img"  # Use raw string for path
+
+datagen = ImageDataGenerator(
+    rescale=1.0/255,
+    validation_split=0.2,
+    horizontal_flip=True,
+    zoom_range=0.2,
+    shear_range=0.2
+)
+
+train_gen = datagen.flow_from_directory(
+    data_dir,
+    target_size=(224, 224),
+    batch_size=32,
+    class_mode='categorical',
+    subset='training'
+)
+
+val_gen = datagen.flow_from_directory(
+    data_dir,
+    target_size=(224, 224),
+    batch_size=32,
+    class_mode='categorical',
+    subset='validation'
+)
+
+# ==========================================================
+# Step 5: Train model
+# ==========================================================
+history = model.fit(
+    train_gen,
+    validation_data=val_gen,
+    epochs=3,           # Reduce epochs to avoid long training
+    verbose=1
+)
+
+# ==========================================================
+# Step 6: Evaluate model
+# ==========================================================
+test_loss, test_acc = model.evaluate(val_gen)
+print(f"\n Test Accuracy: {test_acc * 100:.2f}%")
+print(f"Test Loss: {test_loss:.4f}")
+
+# ==========================================================
+# Step 7: Generate predictions
+# ==========================================================
+x_val, y_val = next(val_gen)
+predictions = model.predict(x_val)
+predicted_labels = np.argmax(predictions, axis=1)
+
+# ==========================================================
+# Step 8: Visualization
+# ==========================================================
+n = 5
+class_labels = list(train_gen.class_indices.keys())
+
+plt.figure(figsize=(6, 12))
+for i in range(n):
+    plt.subplot(n, 1, i + 1)
+    plt.imshow(x_val[i])
+    actual_label = class_labels[np.argmax(y_val[i])]
+    predicted_label = class_labels[predicted_labels[i]]
+    plt.title(f"Actual: {actual_label} | Predicted: {predicted_label}")
+    plt.axis('off')
+plt.tight_layout()
+plt.show()
+
+# ==========================================================
+# Step 9: Classification Report
+# ==========================================================
+y_true = np.argmax(y_val, axis=1)
+print("\n Classification Report:")
+print(classification_report(y_true, predicted_labels, target_names=class_labels))
