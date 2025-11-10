@@ -1,0 +1,117 @@
+
+ # BRAIN TUMOR CLASSIFICATION USING CNN
+
+# Step 1: Import libraries
+import tensorflow as tf
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout
+import matplotlib.pyplot as plt
+import os
+
+# Step 2: Set dataset paths (update these paths)
+train_dir = r"C:\Users\pratiksha sathe\Downloads\brain_tumor_dataset\train"
+val_dir = r"C:\Users\pratiksha sathe\Downloads\brain_tumor_dataset\val"
+test_dir = r"C:\Users\pratiksha sathe\Downloads\brain_tumor_dataset\test"
+
+# Step 3: Data Preprocessing
+train_datagen = ImageDataGenerator(
+    rescale=1./255,
+    rotation_range=20,
+    zoom_range=0.2,
+    shear_range=0.2,
+    horizontal_flip=True
+)
+
+val_datagen = ImageDataGenerator(rescale=1./255)
+test_datagen = ImageDataGenerator(rescale=1./255)
+
+train_data = train_datagen.flow_from_directory(
+    train_dir,
+    target_size=(128, 128),
+    batch_size=32,
+    class_mode='binary'
+)
+
+val_data = val_datagen.flow_from_directory(
+    val_dir,
+    target_size=(128, 128),
+    batch_size=32,
+    class_mode='binary'
+)
+
+test_data = test_datagen.flow_from_directory(
+    test_dir,
+    target_size=(128, 128),
+    batch_size=32,
+    class_mode='binary',
+    shuffle=False
+)
+
+# Step 4: Build CNN model
+model = Sequential([
+    Conv2D(32, (3, 3), activation='relu', input_shape=(128, 128, 3)),
+    MaxPooling2D(2, 2),
+
+    Conv2D(64, (3, 3), activation='relu'),
+    MaxPooling2D(2, 2),
+
+    Conv2D(128, (3, 3), activation='relu'),
+    MaxPooling2D(2, 2),
+
+    Flatten(),
+    Dense(128, activation='relu'),
+    Dropout(0.3),
+    Dense(1, activation='sigmoid')   # sigmoid for binary classification
+])
+
+# Step 5: Compile model
+model.compile(
+    optimizer='adam',
+    loss='binary_crossentropy',
+    metrics=['accuracy']
+)
+
+# Step 6: Train model
+history = model.fit(
+    train_data,
+    validation_data=val_data,
+    epochs=10
+)
+
+# Step 7: Evaluate model
+test_loss, test_acc = model.evaluate(test_data)
+print(f" Test Accuracy: {test_acc:.2f}")
+
+# Step 8: Plot accuracy and loss
+plt.figure(figsize=(10,4))
+plt.subplot(1,2,1)
+plt.plot(history.history['accuracy'], label='Train Accuracy')
+plt.plot(history.history['val_accuracy'], label='Val Accuracy')
+plt.legend()
+plt.title('Accuracy')
+
+plt.subplot(1,2,2)
+plt.plot(history.history['loss'], label='Train Loss')
+plt.plot(history.history['val_loss'], label='Val Loss')
+plt.legend()
+plt.title('Loss')
+plt.show()
+
+# Step 9: Predict on test data
+import numpy as np
+
+y_pred = model.predict(test_data)
+y_pred_classes = (y_pred > 0.5).astype("int32")
+
+# Step 10: Show sample predictions
+plt.figure(figsize=(10,5))
+for i in range(5):
+    img, label = test_data.next()
+    plt.subplot(1,5,i+1)
+    plt.imshow(img[0])
+    pred = model.predict(img)[0][0]
+    pred_label = "Tumor" if pred > 0.5 else "No Tumor"
+    plt.title(pred_label)
+    plt.axis('off')
+plt.show()
